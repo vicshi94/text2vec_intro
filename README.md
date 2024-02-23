@@ -1,2 +1,3 @@
 # text2vec_intro
-A intro to R package text2vec.
+An intro to R package text2vec.
+更多可以看作个人学习笔记。
