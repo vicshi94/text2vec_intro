@@ -1,0 +1,113 @@
+---
+title: "Lab6_task"
+author: "vicshi94"
+date: "2024-02-26"
+output: html_document
+---
+
+## Task - Works of Shakespeare
+
+Let's start with pre-tokenized data from the works of Shakespeare.
+
+```{r modeling}
+# environment setup
+suppressMessages(library(text2vec))
+
+load('shakes_words_df_4text2vec.RData')
+# Given that the data is pre-tokenized, we can directly create a word embedding model
+it = itoken(
+  list(shakes_words$word),
+  progressbar = FALSE 
+)
+
+## Please continue to write the following codes to contrust the final word_vectors
+## Simple pipeline
+## 1. create_vocabulary
+## 2. prune_vocabulary(..., term_count_min = N)
+## 3. vocab_vectorizer
+## 4. create_tcm
+## 5. glove
+## 6. got word_vectors
+```
+
+**A. Choose a word (e.g., "romeo", "juliet") and then find the 5 words most closely related to your word;**
+
+```{r func_findCloseWords}
+## NO NEED TO MODIFY CODES HERE ##
+findCloseWords = function(w,dist,n) {
+  words = rownames(dist)
+  i = which(words==w)
+  if (length(i) > 0) {
+    res = sort(dist[i,])
+    res = as.matrix(res[2:(n+1)])
+    colnames(res) = c("distance")
+    print(res)
+  } 
+  else {
+    print("Word not in corpus.")
+  }
+}
+dist = dist2(word_vectors, method="cosine")
+## NO NEED TO MODIFY CODES HERE ##
+```
+
+```{r closest_words}
+findCloseWords(
+  "word", # <-------------- Change word here, e.g., "romeo", "juliet" 
+  dist, 5)
+```
+
+**B. Construct a single dimension (e.g., gender, social class) with 1-3 pairs of words, and choose 3-5 words to evaluate their positioning on this axis. Following your analysis, please also briefly summarize your observations.**
+
+```{r func_constructDim}
+## NO NEED TO MODIFY CODES HERE ##
+norm_vec <- function(x) sqrt(sum(x^2))
+dot <- function(x,y) (sum(x*y))
+cos <- function(x,y) dot(x,y)/norm_vec(x)/norm_vec(y)
+nrm <- function(x) x/norm_vec(x)
+dimension <- function(x,y) nrm(nrm(x)-nrm(y))
+cdfmn <- function(v) t(apply(as.matrix(data.frame(v)),1,nrm))
+make_dim<-function(embedding,pairs,ndim){
+  word_dims<-data.frame(matrix(NA,nrow(pairs),ndim))
+  for (j in 1:nrow(pairs)){
+    rp_word1<-pairs[j,1]
+    rp_word2<-pairs[j,2]
+    tryCatch(word_dims[j,]<-dimension(embedding[rp_word1,],embedding[rp_word2,]),error=function(e){})
+  }
+  dim_ave<-colMeans(word_dims, na.rm = TRUE)
+  dim_ave_n<-nrm(dim_ave)
+  return(dim_ave_n)
+}
+## NO NEED TO MODIFY CODES HERE ##
+```
+
+**========== HINTS ==========**
+
+1.  Directly open "dim_pairs.csv" in Excel, change pair of words and **SAVE**. Content may like this:
+
+| **poor** | **rich** |
+|----------|----------|
+| ...      | ...      |
+| ...      | ...      |
+
+\* You can also explore other dimensions : ) For more examples of pair of words, please refer to the two optional readings (or their supplement materials) in this week.
+
+2.  Continue:
+
+```{r projection}
+dim_pairs <- read.csv(
+  "dim_pairs.csv", # <---------------- If this is not your csv filename, change it.
+  header=FALSE, stringsAsFactor=F
+  ) 
+construct_dim<-make_dim(
+  word_vectors,dim_pairs,
+  50 # <--------------------- Your rank number in glove()
+  )
+dim_proj<-cdfmn(word_vectors)%*%construct_dim
+
+target_words = c("romeo", "juliet") # <------------- Change these words
+
+dim_proj[target_words,]
+```
+
+3.  Remember Hand in an RMarkdown file (in HTML/pdf format) with code, output, and your interpretation.
