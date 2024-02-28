@@ -1,0 +1,93 @@
+---
+title: "Lab6_task_solution"
+author: "vicshi94"
+date: "2024-02-26"
+output: html_document
+---
+
+## Task - Works of Shakespeare
+
+Let's start with pre-tokenized data from the works of Shakespeare.
+
+**A. Choose a word (e.g., "romeo", "juliet") and then find the 5 words most closely related to your word;**
+
+```{r modeling}
+# environment setup
+suppressMessages(library(text2vec))
+
+load('shakes_words_df_4text2vec.RData')
+# Given that the data is pre-tokenized, we can directly create a word embedding model
+it = itoken(
+  list(shakes_words$word),
+  progressbar = FALSE 
+)
+shakes_vocab = create_vocabulary(it)
+shakes_vocab = prune_vocabulary(shakes_vocab, term_count_min = 5)
+vectorizer = vocab_vectorizer(shakes_vocab)
+shakes_tcm = create_tcm(it, vectorizer, skip_grams_window = 10L)
+
+glove = GlobalVectors$new(
+  rank = 50, # numbers of dimension
+  x_max = 10, 
+)
+shakes_wv_main = glove$fit_transform(
+  shakes_tcm, 
+  n_iter = 25, 
+  convergence_tol = 0.01,
+)
+
+# vectorization of context words
+wv_context = glove$components
+word_vectors = shakes_wv_main + t(wv_context)
+```
+
+```{r func_findCloseWords}
+findCloseWords = function(w,dist,n) {
+  words = rownames(dist)
+  i = which(words==w)
+  if (length(i) > 0) {
+    res = sort(dist[i,])
+    res = as.matrix(res[2:(n+1)])
+    colnames(res) = c("distance")
+    print(res)
+  } 
+  else {
+    print("Word not in corpus.")
+  }
+}
+dist = dist2(word_vectors, method="cosine") 
+```
+
+```{r romeo_closest_words}
+findCloseWords("juliet",dist,5)
+```
+
+**B. Construct a single dimension (e.g., gender, social class) with 1-3 pairs of words, and choose 3-5 words to evaluate their positioning on this axis. Following your analysis, please also briefly summarize your observations.**
+
+```{r func_constructDim}
+norm_vec <- function(x) sqrt(sum(x^2))
+dot <- function(x,y) (sum(x*y))
+cos <- function(x,y) dot(x,y)/norm_vec(x)/norm_vec(y)
+nrm <- function(x) x/norm_vec(x)
+dimension <- function(x,y) nrm(nrm(x)-nrm(y))
+cdfmn <- function(v) t(apply(as.matrix(data.frame(v)),1,nrm))
+make_dim<-function(embedding,pairs,ndim){
+  word_dims<-data.frame(matrix(NA,nrow(pairs),ndim))
+  for (j in 1:nrow(pairs)){
+    rp_word1<-pairs[j,1]
+    rp_word2<-pairs[j,2]
+    tryCatch(word_dims[j,]<-dimension(embedding[rp_word1,],embedding[rp_word2,]),error=function(e){})
+  }
+  dim_ave<-colMeans(word_dims, na.rm = TRUE)
+  dim_ave_n<-nrm(dim_ave)
+  return(dim_ave_n)
+}
+```
+
+```{r function}
+dim_pairs <- read.csv("dim_pairs.csv",header=FALSE, stringsAsFactor=F) 
+gender_dim<-make_dim(word_vectors,dim_pairs,50)
+gender_proj<-cdfmn(word_vectors)%*%gender_dim
+target_words = c("romeo", "juliet")
+gender_proj[target_words,]
+```
